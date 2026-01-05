@@ -2,7 +2,7 @@
 
 <link rel="stylesheet" type="text/css" href="{% static 'polls/style.css' %}">
 
-<a href="{% url 'home' %}">Home</a>
+<a href="{% url 'home' %}">Home</a> | <a href="{% url 'polls:search' %}">Search Questions</a>
 
 {% if latest_question_list %}
     <ul>

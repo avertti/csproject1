@@ -3,6 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
+from django.db import connection
 
 from .models import Choice, Question
 
@@ -58,3 +59,34 @@ def vote(request, question_id):
         # with POST data. This prevents data from being posted twice if a
         # user hits the Back button.
         return HttpResponseRedirect(reverse("polls:results", args=(question.id,)))
+
+
+# Flaw 1: Injection AO3
+def search_questions(request):
+
+    search_query = request.GET.get("q", "")
+
+    with connection.cursor() as cursor:
+        query = (
+            "SELECT id, question_text, pub_date FROM polls_question WHERE question_text LIKE '%"
+            + search_query
+            + "%'"
+        )
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+    # Fix 1:
+    # with connection.cursor() as cursor:
+    #     query = "SELECT id, question_text, pub_date FROM polls_question WHERE question_text LIKE %s"
+    #     cursor.execute(query, [f"%{search_query}%"])
+    #     results = cursor.fetchall()
+
+    questions = []
+    for row in results:
+        questions.append({"id": row[0], "question_text": row[1], "pub_date": row[2]})
+
+    return render(
+        request,
+        "polls/search_results.html",
+        {"questions": questions, "search_query": search_query},
+    )
