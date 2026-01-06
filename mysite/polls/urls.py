@@ -8,6 +8,8 @@ urlpatterns = [
     path("<int:pk>/", views.DetailView.as_view(), name="detail"),
     path("<int:pk>/results/", views.ResultsView.as_view(), name="results"),
     path("<int:question_id>/vote/", views.vote, name="vote"),
-    # FLAW 1: SQL Injection vulnerable endpoint
+    # Flaw 1: SQL Injection vulnerable endpoint
     path("search/", views.search_questions, name="search"),
+    # Flaw 2: Insecure direct object reference
+    path("<int:question_id>/delete/", views.delete_question, name="delete"),
 ]

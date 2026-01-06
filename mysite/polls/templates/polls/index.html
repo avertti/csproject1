@@ -1,13 +1,27 @@
-{% load static %}
+<ul>    
+    <li><a href="{% url 'home' %}">Home</a></li>
+    <li><a href="{% url 'polls:search' %}">Search Questions</a></li>
+</ul>
 
-<link rel="stylesheet" type="text/css" href="{% static 'polls/style.css' %}">
+{% if user.is_authenticated %}
+    Logged in as: {{ user.username }} | 
+    <form method="post" action="{% url 'logout' %}" style="display: inline;">
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+    </form>
+{% else %}
+    <a href="{% url 'login' %}">Login</a>
+{% endif %}
 
-<a href="{% url 'home' %}">Home</a> | <a href="{% url 'polls:search' %}">Search Questions</a>
+
 
 {% if latest_question_list %}
     <ul>
     {% for question in latest_question_list %}
-        <li><a href="{% url 'polls:detail' question.id %}">{{ question.question_text }}</a></li>
+        <li>[ID: {{ question.id }}] <a href="{% url 'polls:detail' question.id %}">{{ question.question_text }}</a> 
+        {% if question.owner %}- Owner: {{ question.owner.username }}{% endif %}
+        <a href="{% url 'polls:delete' question.id %}?user_id={{ user.id }}">[Delete]</a>    
+        </li>
     {% endfor %}
     </ul>
 {% else %}

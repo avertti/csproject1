@@ -1,9 +1,10 @@
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
 from django.db import connection
+from django.contrib.auth.decorators import login_required
 
 from .models import Choice, Question
 
@@ -43,7 +44,6 @@ def vote(request, question_id):
     try:
         selected_choice = question.choice_set.get(pk=request.POST["choice"])
     except (KeyError, Choice.DoesNotExist):
-        # Redisplay the question voting form.
         return render(
             request,
             "polls/detail.html",
@@ -55,9 +55,6 @@ def vote(request, question_id):
     else:
         selected_choice.votes += 1
         selected_choice.save()
-        # Always return an HttpResponseRedirect after successfully dealing
-        # with POST data. This prevents data from being posted twice if a
-        # user hits the Back button.
         return HttpResponseRedirect(reverse("polls:results", args=(question.id,)))
 
 
@@ -90,3 +87,45 @@ def search_questions(request):
         "polls/search_results.html",
         {"questions": questions, "search_query": search_query},
     )
+
+    # Flaw 2: Broken Access Control AO1
+
+
+def delete_question(request, question_id):
+    question = get_object_or_404(Question, pk=question_id)
+    user_id = request.GET.get("user_id") or request.POST.get("user_id")
+
+    if (
+        user_id
+        and question.owner
+        and (str(question.owner.id) == user_id or request.user.is_staff)
+    ):
+        if request.method == "POST":
+            question.delete()
+            return HttpResponseRedirect(reverse("polls:index"))
+        return render(
+            request,
+            "polls/delete_confirm.html",
+            {"question": question, "user_id": user_id},
+        )
+
+    return HttpResponseRedirect(reverse("polls:index"))
+
+
+# Fix 2:
+# from django.contrib.auth.decorators import login_required
+# from django.http import HttpResponseForbidden
+
+
+# @login_required
+# def delete_question(request, question_id):
+#       question = get_object_or_404(Question, pk=question_id)
+
+#       if question.owner != request.user and not request.user.is_staff:
+#           return HttpResponseForbidden("You can't delete this question.")
+
+#       if request.method == "POST":
+#           question.delete()
+#           return HttpResponseRedirect(reverse("polls:index"))
+
+#       return render(request, "polls/delete_confirm.html", {"question": question})
