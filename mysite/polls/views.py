@@ -5,6 +5,7 @@ from django.views import generic
 from django.utils import timezone
 from django.db import connection
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Choice, Question
 
@@ -41,8 +42,14 @@ class ResultsView(generic.DetailView):
 
 def vote(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
+    # Flaw 3: CSRF, Accepts GET for voting
     try:
-        selected_choice = question.choice_set.get(pk=request.POST["choice"])
+        choice_id = request.GET.get("choice") or request.POST.get("choice")
+        selected_choice = question.choice_set.get(pk=choice_id)
+    # Fix 3:
+    # Only allow POST requests
+    # try:
+    #    selected_choice = question.choice_set.get(pk=request.POST["choice"])
     except (KeyError, Choice.DoesNotExist):
         return render(
             request,
@@ -88,7 +95,8 @@ def search_questions(request):
         {"questions": questions, "search_query": search_query},
     )
 
-    # Flaw 2: Broken Access Control AO1
+
+# Flaw 2: Broken Access Control AO1
 
 
 def delete_question(request, question_id):
