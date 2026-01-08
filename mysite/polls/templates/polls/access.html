@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Private Poll Access</title>
+</head>
+<body>
+    <h1>Private Poll: {{ question.question_text }}</h1>
+    
+    <p>Enter the access code to view the poll.</p>
+    
+    {% if error %}
+        <p>{{ error }}</p>
+    {% endif %}
+    
+    <form method="post">
+        {% csrf_token %}
+        <label for="access_code">Access Code:</label>
+        <input type="text" name="access_code" id="access_code" required>
+        <button type="submit">Submit</button>
+    </form>
+    
+    <p><a href="{% url 'polls:index' %}">Back to polls</a></p>
+</body>
+</html>

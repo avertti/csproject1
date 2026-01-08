@@ -1,11 +1,9 @@
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponseRedirect, HttpResponseForbidden
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
 from django.db import connection
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 
 from .models import Choice, Question
 
@@ -33,6 +31,12 @@ class DetailView(generic.DetailView):
         Excludes any questions that aren't published yet.
         """
         return Question.objects.filter(pub_date__lte=timezone.now())
+
+    def get(self, request, *args, **kwargs):
+        question = self.get_object()
+        if question.access_code and not request.session.get(f"access_{question.pk}"):
+            return HttpResponseRedirect(reverse("polls:access", args=(question.pk,)))
+        return super().get(request, *args, **kwargs)
 
 
 class ResultsView(generic.DetailView):
@@ -119,21 +123,65 @@ def delete_question(request, question_id):
 
     return HttpResponseRedirect(reverse("polls:index"))
 
+    # Fix 2:
+    # from django.contrib.auth.decorators import login_required
+    # from django.http import HttpResponseForbidden
 
-# Fix 2:
-# from django.contrib.auth.decorators import login_required
-# from django.http import HttpResponseForbidden
+    # @login_required
+    # def delete_question(request, question_id):
+    #       question = get_object_or_404(Question, pk=question_id)
+
+    #       if question.owner != request.user and not request.user.is_staff:
+    #           return HttpResponseForbidden("You can't delete this question.")
+
+    #       if request.method == "POST":
+    #           question.delete()
+    #           return HttpResponseRedirect(reverse("polls:index"))
+
+    #       return render(request, "polls/delete_confirm.html", {"question": question})
+
+    # def access_code_poll(request, question_id):
+    question = get_object_or_404(Question, pk=question_id)
+
+    if not question.access_code:
+        return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+
+    if request.method == "POST":
+        entered_code = request.POST.get("access_code", "")
+        # Flaw 4: Direct plaintext comparison
+        if entered_code == question.access_code:
+            request.session[f"access_{question_id}"] = True
+            return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+        else:
+            return render(
+                request,
+                "polls/access.html",
+                {"question": question, "error": "Invalid access code"},
+            )
+
+    return render(request, "polls/access.html", {"question": question})
 
 
-# @login_required
-# def delete_question(request, question_id):
-#       question = get_object_or_404(Question, pk=question_id)
+# Fix 4:
+from django.contrib.auth.hashers import check_password
 
-#       if question.owner != request.user and not request.user.is_staff:
-#           return HttpResponseForbidden("You can't delete this question.")
 
-#       if request.method == "POST":
-#           question.delete()
-#           return HttpResponseRedirect(reverse("polls:index"))
+def access_code_poll(request, question_id):
+    question = get_object_or_404(Question, pk=question_id)
 
-#       return render(request, "polls/delete_confirm.html", {"question": question})
+    if not question.access_code:
+        return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+
+    if request.method == "POST":
+        entered_code = request.POST.get("access_code", "")
+
+        if entered_code and check_password(entered_code, question.access_code):
+            request.session[f"access_{question_id}"] = True
+            return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+        else:
+            return render(
+                request,
+                "polls/access.html",
+                {"question": question, "error": "Invalid access code"},
+            )
+    return render(request, "polls/access.html", {"question": question})

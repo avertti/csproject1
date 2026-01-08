@@ -12,4 +12,6 @@ urlpatterns = [
     path("search/", views.search_questions, name="search"),
     # Flaw 2: Insecure direct object reference
     path("<int:question_id>/delete/", views.delete_question, name="delete"),
+    # Flaw 4: Plaintext access code
+    path("<int:question_id>/access/", views.access_code_poll, name="access"),
 ]
