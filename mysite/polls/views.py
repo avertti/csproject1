@@ -1,11 +1,16 @@
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponseRedirect
+
+# ,  HttpResponseForbidden
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
 from django.db import connection
 
+# from django.contrib.auth.hashers import check_password
 from .models import Choice, Question
+
+# import logging
 
 
 class IndexView(generic.ListView):
@@ -69,10 +74,12 @@ def vote(request, question_id):
         return HttpResponseRedirect(reverse("polls:results", args=(question.id,)))
 
 
-# Flaw 1: Injection AO3
+# Flaw 1: Injection A03
 def search_questions(request):
 
     search_query = request.GET.get("q", "")
+
+    # Flaw 5: No logging
 
     with connection.cursor() as cursor:
         query = (
@@ -89,6 +96,12 @@ def search_questions(request):
     #     cursor.execute(query, [f"%{search_query}%"])
     #     results = cursor.fetchall()
 
+    # Fix 5: Add logging to search_questions
+    # import logging
+    # security_logger = logging.getLogger("security")
+    # if any(char in search_query for char in ["OR", "'", "+"]):
+    #     security_logger.warning(f"Potential SQL injection attempt: {search_query}")
+
     questions = []
     for row in results:
         questions.append({"id": row[0], "question_text": row[1], "pub_date": row[2]})
@@ -99,13 +112,14 @@ def search_questions(request):
         {"questions": questions, "search_query": search_query},
     )
 
-
-# Flaw 2: Broken Access Control AO1
+    # Flaw 2: Broken Access Control A01
 
 
 def delete_question(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
     user_id = request.GET.get("user_id") or request.POST.get("user_id")
+
+    # Flaw 5: No logging
 
     if (
         user_id
@@ -140,7 +154,28 @@ def delete_question(request, question_id):
 
     #       return render(request, "polls/delete_confirm.html", {"question": question})
 
-    # def access_code_poll(request, question_id):
+    # Fix 5: Add logging to delete_question
+
+    # import logging
+    # security_logger = logging.getLogger("security")
+    # def delete_question(request, question_id):
+    #     question = get_object_or_404(Question, pk=question_id)
+
+    #     if question.owner != request.user and not request.user.is_staff:
+    #         security_logger.warning(f"Unauthorized delete: Question {question_id} by user {request.user.username}")
+    #         return HttpResponseForbidden("You can't delete this question.")
+
+    #     if request.method == "POST":
+    #         security_logger.info(f"Question {question_id} deleted by user {request.user.username}")
+    #         question.delete()
+    #         return HttpResponseRedirect(reverse("polls:index"))
+
+    #     return render(request, "polls/delete_confirm.html", {"question": question})
+
+    # Flaw 5: No logging
+
+
+def access_code_poll(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
 
     if not question.access_code:
@@ -148,7 +183,7 @@ def delete_question(request, question_id):
 
     if request.method == "POST":
         entered_code = request.POST.get("access_code", "")
-        # Flaw 4: Direct plaintext comparison
+        # Flaw 4: Direvt plaintext comparison
         if entered_code == question.access_code:
             request.session[f"access_{question_id}"] = True
             return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
@@ -163,25 +198,43 @@ def delete_question(request, question_id):
 
 
 # Fix 4:
-from django.contrib.auth.hashers import check_password
+# from django.contrib.auth.hashers import check_password
 
 
-def access_code_poll(request, question_id):
-    question = get_object_or_404(Question, pk=question_id)
+# def access_code_poll(request, question_id):
+#   question = get_object_or_404(Question, pk=question_id)
 
-    if not question.access_code:
-        return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+#    if not question.access_code:
+#       return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
 
-    if request.method == "POST":
-        entered_code = request.POST.get("access_code", "")
+#   if request.method == "POST":
+#       entered_code = request.POST.get("access_code", "")
 
-        if entered_code and check_password(entered_code, question.access_code):
-            request.session[f"access_{question_id}"] = True
-            return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
-        else:
-            return render(
-                request,
-                "polls/access.html",
-                {"question": question, "error": "Invalid access code"},
-            )
-    return render(request, "polls/access.html", {"question": question})
+#       if entered_code and check_password(entered_code, question.access_code):
+#           request.session[f"access_{question_id}"] = True
+#           return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+#       else:
+#           return render(
+#               request,
+#               "polls/access.html",
+#               {"question": question, "error": "Invalid access code"}
+#           )
+#   return render(request, "polls/access.html", {"question": question})
+
+# Fix 5: Add logging to access_code_poll
+# import logging
+# security_logger = logging.getLogger("security")
+# def access_code_poll(request, question_id):
+#     question = get_object_or_404(Question, pk=question_id)
+#     if not question.access_code:
+#         return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+#     if request.method == "POST":
+#         entered_code = request.POST.get("access_code", "")
+#         if entered_code and check_password(entered_code, question.access_code):
+#             security_logger.info(f"Successful access to poll {question_id} from IP {request.META.get('REMOTE_ADDR')}")
+#             request.session[f"access_{question_id}"] = True
+#             return HttpResponseRedirect(reverse("polls:detail", args=(question_id,)))
+#         else:
+#             security_logger.warning(f"Failed access to poll {question_id} from IP {request.META.get('REMOTE_ADDR')}")
+#             return render(request, "polls/access.html", {"question": question, "error": "Invalid access code"})
+#     return render(request, "polls/access.html", {"question": question})
